@@ -51,25 +51,27 @@
 
     function openUriWithTimeoutHack(uri, failCb) {
 
-        var timeout = setTimeout(function () {
-            failCb();
-            handler.remove();
-        }, 1000);
+        
 
         //handle page running in an iframe (blur must be registered with top level window)
         var target = window;
         while (target != target.parent) {
             target = target.parent;
         }
-
+        setTimeout(target.focus, 0);
         var handler = _registerEvent(target, "blur", onBlur);
-
+        
+        var timeout = setTimeout(function () {
+            handler.remove();
+            failCb();
+        }, 2000);
+        
         function onBlur() {
             clearTimeout(timeout);
             handler.remove();
         }
 
-        window.location = uri;
+        window.location.assign(uri);
     }
 
     function openUriUsingFirefox(uri, failCb) {
@@ -87,7 +89,9 @@
     }
 
     function openUriUsingIEInOlderWindows(uri, failCb) {
-        if (getInternetExplorerVersion() === 10) {
+		if (getInternetExplorerVersion() === -1) {
+			openUriUsingIE10InWindows7(uri, failCb);
+		} else if (getInternetExplorerVersion() === 10) {
             openUriUsingIE10InWindows7(uri, failCb);
         } else if (getInternetExplorerVersion() === 9 || getInternetExplorerVersion() === 11) {
             openUriWithHiddenFrame(uri, failCb);
@@ -165,14 +169,19 @@
         }
         return rv;
     }
-
+    
     window.protocolCheck = function (uri, failCb) {
         function failCallback() {
-            failCb && failCb();
+            failCb && setTimeout(failCb(),1000);
         }
 
         if (navigator.msLaunchUri) { //for IE and Edge in Win 8 and Win 10
-            openUriWithMsLaunchUri(uri, failCb);
+			if (getInternetExplorerVersion() === -1) {
+				openUriUsingIE10InWindows7(uri, failCb);
+			}
+            else{
+				openUriWithMsLaunchUri(uri, failCb);
+			}
         } else {
             var browser = checkBrowser();
 
@@ -182,8 +191,15 @@
                 openUriWithTimeoutHack(uri, failCallback);
             } else if (browser.isIE) {
                 openUriUsingIEInOlderWindows(uri, failCallback);
+            } else if (browser.isSafari) {
+            	if(failCb){
+            		failCb();
+            	}
             } else {
                 //not supported, implement please
+            	if(failCb){
+            		failCb();
+            	}
             }
         }
     }
